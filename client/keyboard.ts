@@ -4,12 +4,31 @@ import { Platform } from "react-native";
 /** The slice of the DOM this plugin touches; the project compiles without the DOM library. */
 interface KeyEventLike {
   key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean; defaultPrevented: boolean;
+  shiftKey: boolean; repeat: boolean; isComposing: boolean;
   target: unknown; preventDefault(): void;
 }
 interface ElementLike { isContentEditable?: boolean; tagName?: string; closest?(selector: string): unknown }
 interface DocumentLike {
   addEventListener(type: "keydown", listener: (event: KeyEventLike) => void): void;
   removeEventListener(type: "keydown", listener: (event: KeyEventLike) => void): void;
+}
+
+function webDocument() {
+  if (Platform.OS === "web") return (globalThis as { document?: DocumentLike }).document;
+}
+
+export function registerSearchShortcut(openSearch: () => void) {
+  const doc = webDocument();
+  if (!doc) return;
+  const handler = (event: KeyEventLike) => {
+    // Other app bindings and plugin installations get only one chance to handle the key.
+    if (event.defaultPrevented || event.isComposing || event.altKey || !event.shiftKey) return;
+    if (event.metaKey === event.ctrlKey || event.key.toLowerCase() !== "y") return;
+    event.preventDefault();
+    if (!event.repeat) openSearch();
+  };
+  doc.addEventListener("keydown", handler);
+  return () => doc.removeEventListener("keydown", handler);
 }
 
 export type ScreenKey = "down" | "up" | "enter" | "slash";
@@ -28,8 +47,8 @@ export function useScreenKeys(rootId: string, ignore: () => unknown, onKey: (key
   const latest = useRef(onKey);
   latest.current = onKey;
   useEffect(() => {
-    const doc = (globalThis as { document?: DocumentLike }).document;
-    if (Platform.OS !== "web" || !doc) return;
+    const doc = webDocument();
+    if (!doc) return;
     const handler = (event: KeyEventLike) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.target === ignore()) return;

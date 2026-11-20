@@ -4,6 +4,7 @@ import { contributeChat } from "./client/chat";
 import { contributeDisplay } from "./client/display";
 import { registerHost } from "./client/federation";
 import { composerLookup } from "./client/attach-target";
+import { registerSearchShortcut } from "./client/keyboard";
 import { SEARCH_SCREEN, SearchScreen } from "./client/search-screen";
 
 export default function contribute(client: PluginClientContext) {
@@ -49,7 +50,9 @@ export default function contribute(client: PluginClientContext) {
     contributeChat(client),
   ];
   const releaseDisplay = contributeDisplay(client);
+  const releaseShortcut = registerSearchShortcut(() => client.openScreen({ screenId: SEARCH_SCREEN }));
   return () => {
+    releaseShortcut?.();
     for (const remove of removers) if (typeof remove === "function") void remove();
     releaseDisplay();
     releaseHost();
